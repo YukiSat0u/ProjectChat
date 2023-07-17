@@ -47,6 +47,27 @@ int Server::init()
 #endif
 		return 1;
 	}
+
+	mysql_init(&mysql);
+	if (&mysql == nullptr)
+	{
+		// Если дескриптор не получен — выводим сообщение об ошибке
+		std::cout << "Error: can't create MySQL-descriptor" << std::endl;
+		return 1;
+	}
+
+	// Подключаемся к серверу
+	if (!mysql_real_connect(&mysql, "localhost", "root", "1237", "chatdb", NULL, NULL, 0))
+	{
+		// Если нет возможности установить соединение с БД выводим сообщение об ошибке
+		std::cout << "Error: can't connect to database " << mysql_error(&mysql) << std::endl;
+		return 1;
+	}
+	else
+	{
+		// Если соединение успешно установлено выводим фразу — "Database connected!"
+		std::cout << "Database connected!" << std::endl;
+	}
 }
 
 void Server::tcpConnect()
@@ -62,6 +83,62 @@ void Server::tcpConnect()
 	inet_ntop(AF_INET, &(client_address.sin_addr), client_ip, INET_ADDRSTRLEN);
 	std::cout << "Connection from " << client_ip << ":" << ntohs(client_address.sin_port) << " was successfully established" << std::endl;
 #endif
+}
+
+void Server::singUp()
+{
+	char buffer[1024] = { 0 };
+	bool result = true;
+	result = recv(clientsocket, buffer, 1024, 0);
+	std::string login, password, name, gender, line;
+	std::vector<std::string> lines;
+	std::istringstream iss = (std::istringstream)buffer;
+	if (strcmp(buffer, "singup") == 0)
+	{
+		lines.clear();
+		result = recv(clientsocket, buffer, 1024, 0);
+		iss = (std::istringstream)buffer;
+	}
+	while (std::getline(iss, line, ' '))
+		lines.push_back(line);
+
+	login = lines[0];
+	password = lines[1];
+	name = lines[2];
+	gender = lines[3];
+
+	//std::string queryLogin = "SELECT login, password, name, gender FROM users WHERE login = '" + login + "'";
+	mysql_query(&mysql, "SELECT login, password, name, gender FROM users");
+	res = mysql_store_result(&mysql);
+	while (row = mysql_fetch_row(res))
+	{
+		if (row[0] == login)
+		{
+			send(clientsocket, "Логин занят", 1024, 0);
+			result = false;
+			break;
+		}
+	}
+	if (result)
+	{
+		std::string query = "INSERT INTO users (login, password, name, gender) VALUES ('" + login + "', '" + password + "', '" + name + "', '" + gender + "')";
+
+		if (mysql_query(&mysql, query.c_str()) != 0)
+		{
+			std::cerr << "Ошибка при выполнении запроса: " << mysql_error(&mysql) << std::endl;
+			mysql_close(&mysql);
+			return;
+		}
+
+		std::cout << "Пользователь успешно зарегистрирован!" << std::endl;
+		send(clientsocket, "Пользователь успешно зарегистрирован!", 1024, 0);
+	}
+	lines.clear();
+}
+
+void Server::login()
+{
+
 }
 
 void Server::sentMessage()
@@ -172,9 +249,9 @@ void Server::recvMessage()
 		}
 		else {
 			std::cerr << "Error reading message: " << error << std::endl;
-	}
+		}
 		break;
-}
+	}
 #endif
 
 	std::string data = buffer;
@@ -189,7 +266,11 @@ void Server::serverUpdate()
 	{
 		char buffer[1024] = { 0 };
 		result = recv(clientsocket, buffer, 1024, 0);
-		if (strcmp(buffer, "send") == 0)
+		if (strcmp(buffer, "singup") == 0)
+			singUp();
+		else if (strcmp(buffer, "login") == 0)
+			login();
+		else if (strcmp(buffer, "send") == 0)
 			recvMessage();
 		else if (strcmp(buffer, "recv") == 0)
 			sentMessage();

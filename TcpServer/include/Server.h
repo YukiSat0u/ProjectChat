@@ -5,6 +5,8 @@
 #include <fstream>
 #include <sstream>
 #include <thread>
+#include <vector>
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <WS2tcpip.h>
@@ -19,6 +21,8 @@
 #define CloseSocket close
 #endif
 
+#include "mysql.h"
+
 class Server
 {
 public:
@@ -29,6 +33,8 @@ public:
 	void recvMessage();
 	void sentMessage();
 	void delMessage();
+	void singUp();
+	void login();
 
 private:
 #ifdef _WIN32
@@ -40,7 +46,9 @@ private:
 	sockaddr_in client_address;
 	int client_address_len;
 	
-
+	MYSQL mysql;
+	MYSQL_RES* res;
+	MYSQL_ROW row;
 #else
 	int result;
 	int serversocket;

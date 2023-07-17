@@ -1,5 +1,29 @@
 #include "../include/Chat.h"
 
+int Chat::bd()
+{
+	mysql_init(&mysql);
+	if (&mysql == nullptr)
+	{
+		// Если дескриптор не получен — выводим сообщение об ошибке
+		std::cout << "Error: can't create MySQL-descriptor" << std::endl;
+		return 1;
+	}
+
+	// Подключаемся к серверу
+	if (!mysql_real_connect(&mysql, "localhost", "root", "1237", "chatdb", NULL, NULL, 0))
+	{
+		// Если нет возможности установить соединение с БД выводим сообщение об ошибке
+		std::cout << "Error: can't connect to database " << mysql_error(&mysql) << std::endl;
+		return 1;
+	}
+	else
+	{
+		// Если соединение успешно установлено выводим фразу — "Database connected!"
+		std::cout << "Database connected!" << std::endl;
+	}
+}
+
 void Chat::tcpConnect()
 {
 #ifdef _WIN32
@@ -45,7 +69,6 @@ void Chat::showLoginMenu()
 	std::cout << "\t\tChat 2.0 is run.\n\a";
 	do
 	{
-		
 		std::cout << "\n(1)SignUp\t";
 		std::cout << "(2)Login\t";
 		std::cout << "(0)ShutDown\n>> ";
@@ -109,7 +132,7 @@ void Chat::showUserMenu()
 	}
 }
 
-void Chat::showAllUsersName() const
+void Chat::showAllUsersName()
 {
 #ifdef _WIN32
 	std::locale::global(std::locale("en_US.UTF-8"));
@@ -119,44 +142,57 @@ void Chat::showAllUsersName() const
 
 	std::cout << "--- Users ---" << std::endl;
 
-	std::ifstream user_file("users.txt");
-
-	std::string login;
-	std::string password;
-	std::string name;
-	std::string gender;
-
-	while (user_file >> login >> password >> name >> gender)
+	std::string queryName = "SELECT name FROM users";
+	mysql_query(&mysql, queryName.c_str());
+	if (res = mysql_store_result(&mysql)) 
 	{
-		User user(login, password, name, gender);
-
-#ifdef _WIN32
-		if (user.getUserGender() == "Male")
-			std::wcout << (wchar_t)Spades << " ";
-		else if (user.getUserGender() == "Female")
-			std::wcout << (wchar_t)Spades1 << " ";
-#else
-		if (user.getUserGender() == "Male")
-			std::cout << "M ";
-		else if (user.getUserGender() == "Female")
-			std::cout << "W ";
-#endif
-
-		
-
-		std::cout << user.getUserName();
-
-		if (login == _currentUser->getUserLogin())
-			std::cout << "(me)";
-
-		std::cout << std::endl;
+		while (row = mysql_fetch_row(res))
+		{
+			for (int i = 0; i < mysql_num_fields(res); i++) 
+			{
+				std::cout << row[i];
+				if (row[i] == _currentUser->getUserName())
+				{
+					std::cout << "(me)";
+				}
+				std::cout << std::endl;
+			}
+		}
 	}
+
+	/*std::string queryGender = "SELECT gender FROM users";
+	mysql_query(&mysql, queryGender.c_str());
+	if (res = mysql_store_result(&mysql))
+	{
+		while (row = mysql_fetch_row(res))
+		{
+			for (int i = 0; i < mysql_num_fields(res); i++)
+			{
+#ifdef _WIN32
+				if (user.getUserGender() == "Male")
+					std::wcout << (wchar_t)Spades << " ";
+				else if (user.getUserGender() == "Female")
+					std::wcout << (wchar_t)Spades1 << " ";
+#else
+				if (user.getUserGender() == "Male")
+					std::cout << "M ";
+				else if (user.getUserGender() == "Female")
+					std::cout << "W ";
+#endif
+			}
+		}
+	}*/
 
 	std::cout << "----------" << std::endl;
 }
 
 void Chat::singUp()
 {
+	char buffer[1024] = {};
+	std::string requestSingUp = "singup";
+	int requestLength = requestSingUp.length();
+	send(clientsocket, requestSingUp.c_str(), requestLength, 0);
+
 	std::string login, name, gender, password;
 	std::cout << "Login: ";
 	std::cin >> login;
@@ -174,27 +210,32 @@ void Chat::singUp()
 			std::cout << "Enter Male or Female";
 	} while (!(gender == "Male" || gender == "Female"));
 
-	if (getUserByLogin(login) || login == "All")
-		throw UserLoginExp();
-	if (getUserByName(name) || name == "All")
-		throw UserNameExp();
-
-	User user(login, password, name, gender);
-	_users.push_back(user);
-	_currentUser = std::make_shared<User>(user);
-
-	if (!user_file)
-		user_file = std::fstream("users.txt", std::ios::in | std::ios::out | std::ios::trunc);
-
-	if (user_file)
+	if (login == "All")
 	{
-		User obj(login, password, name, gender);
-		user_file << obj << std::endl;
+		_currentUser = nullptr;
+		throw UserLoginExp();
 	}
-	else
-		std::cout << "Could not open file users.txt!" << std::endl;
-}
+	if (name == "All")
+	{
+		_currentUser = nullptr;
+		throw UserNameExp();
+	}
 
+	std::string users = login + " " + password + " " + name + " " + gender;
+	int usersLength = users.length();
+	send(clientsocket, users.c_str(), usersLength, 0);
+
+	recv(clientsocket, buffer, sizeof(buffer), 0);
+	std::cout << buffer << std::endl;
+
+	if (strcmp(buffer, "Логин занят") == 0)
+		_currentUser = nullptr;
+	else
+	{
+		auto getUser = getUserByLogin(login);
+		_currentUser = getUser;
+	}
+}
 
 void Chat::login()
 {
@@ -238,7 +279,7 @@ void Chat::login()
 	} while (!_currentUser);
 }
 
-void Chat::showChat() const
+void Chat::showChat()
 {
 	std::string requestRecv = "recv";
 	int requestLength = requestRecv.length();
@@ -376,31 +417,32 @@ void Chat::deleteMessage()
 		std::cout << buffer << std::endl << std::endl;
 }
 
-std::shared_ptr<User> Chat::getUserByLogin(const std::string& login) const
+std::shared_ptr<User> Chat::getUserByLogin(const std::string& login)
 {
-	std::ifstream user_file("users.txt");
-	if (!user_file.is_open())
-	{
-		std::cout << "Error opening users file." << std::endl;
-		return nullptr;
-	}
+	std::string password, name, gender;
+	std::string query = "SELECT login, password, name, gender FROM users WHERE login = '" + login + "'";
+	mysql_query(&mysql, query.c_str());
 
-	std::string userLogin;
-	std::string userPassword;
-	std::string userName;
-	std::string userGender;
-
-	while (user_file >> userLogin >> userPassword >> userName >> userGender)
+	if (res = mysql_store_result(&mysql))
 	{
-		if (userLogin == login)
+		while (row = mysql_fetch_row(res))
 		{
-			return std::make_shared<User>(userLogin, userPassword, userName, userGender);
+			if (row[0] == login)
+			{
+				password = row[1];
+				name = row[2];
+				gender = row[3];
+
+				return std::make_shared<User>(login, password, name, gender);
+			}
+			else
+				return nullptr;
 		}
 	}
 	return nullptr;
 }
 
-std::shared_ptr<User> Chat::getUserByName(const std::string& name) const
+std::shared_ptr<User> Chat::getUserByName(const std::string& name)
 {
 	for (auto& user : _users)
 	{

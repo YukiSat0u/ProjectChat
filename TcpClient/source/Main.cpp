@@ -6,6 +6,7 @@ int main()
 
 	Chat chat;
 	
+	chat.bd();
 	chat.tcpConnect();
 
 	chat.startChat();

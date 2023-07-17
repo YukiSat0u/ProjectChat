@@ -27,6 +27,7 @@
 
 #include "User.h"
 #include "Message.h"
+#include "mysql.h"
 
 struct UserLoginExp: public std::exception
 {
@@ -41,6 +42,7 @@ struct UserNameExp : public std::exception
 class Chat
 {
 public:
+	int bd();
 	void startChat();
 	bool isChatWork() const { return _isChatWork; }
 	std::shared_ptr<User> getCurrentUser() const { return _currentUser; }
@@ -65,15 +67,19 @@ private:
 	std::fstream user_file = std::fstream("users.txt", std::ios::in | std::ios::out | std::ios::app);
 	std::string strToUpper(std::string str);
 
+	MYSQL mysql;
+	MYSQL_RES* res;
+	MYSQL_ROW row;
+
 	void login();
 	void singUp();
-	void showChat() const;
-	void showAllUsersName() const;
+	void showChat();
+	void showAllUsersName();
 	void addMessage();
 	void deleteMessage();
 	
 	std::vector<User>& getAllUsers() { return _users; }
 	std::vector<Message>& getAllmessages() { return _messages; }
-	std::shared_ptr<User> getUserByLogin(const std::string& login) const;
-	std::shared_ptr<User> getUserByName(const std::string& name) const;
+	std::shared_ptr<User> getUserByLogin(const std::string& login); //const;
+	std::shared_ptr<User> getUserByName(const std::string& name); //const;
 };
