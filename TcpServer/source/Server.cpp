@@ -107,7 +107,6 @@ void Server::singUp()
 	name = lines[2];
 	gender = lines[3];
 
-	//std::string queryLogin = "SELECT login, password, name, gender FROM users WHERE login = '" + login + "'";
 	mysql_query(&mysql, "SELECT login, password, name, gender FROM users");
 	res = mysql_store_result(&mysql);
 	while (row = mysql_fetch_row(res))
@@ -143,36 +142,39 @@ void Server::login()
 
 void Server::sentMessage()
 {
-	// отправка ответа клиенту
-#ifdef _WIN32
-	msg_file = std::fstream("../../messages.txt", std::ios::in | std::ios::out | std::ios::app);
-#else
-	msg_file = std::fstream("messages.txt", std::ios::in | std::ios::out | std::ios::app);
-#endif
-	std::string from, to, text;
-
-	std::ostringstream messages;
-	while (getline(msg_file, from, ' ') && getline(msg_file, to, ' ') && getline(msg_file, text))
+	char buffer[1024] = { 0 };
+	recv(clientsocket, buffer, 1024, 0);
+	std::string currentUser = buffer;
+	std::string messages;
+	std::string query = "SELECT from_name, to_name, text FROM messages WHERE from_name = '" + currentUser + "' OR to_name = '" + currentUser + "' OR to_name = 'All'";
+	mysql_query(&mysql, query.c_str());
+	if (res = mysql_store_result(&mysql))
 	{
-		std::string message = "Message from " + from + " to " + to + "\nText: " + text + "\n";
-		messages << message;
-	}
-	msg_file.close();
+		while (row = mysql_fetch_row(res))
+		{
+			std::string fromName = row[0];
+			std::string toName = row[1];
+			std::string text = row[2];
+			// Формирование строки сообщения
+			std::string message = "From: " + fromName + "\nTo: " + toName + "\nText: " + text + "\n\n";
+			messages += message;
+		}
 
-	// Отправка сообщений клиентам
-	std::string messages_str = messages.str();
-	if (!messages_str.empty())
-	{
-		int bytes_sent = send(clientsocket, messages_str.c_str(), messages_str.size(), 0);
+		// Освобождение результата запроса
+		mysql_free_result(res);
+
+		// Отправка сообщений клиентам
+		int bytes_sent = send(clientsocket, messages.c_str(), messages.size(), 0);
 		if (bytes_sent < 0)
 		{
 			perror("Failed to send message");
 			exit(EXIT_FAILURE);
 		}
 
-		std::cout << "Chat: \n" << messages_str << "Chat end." << std::endl;
+		std::cout << "Chat:\n" << messages << "Chat end." << std::endl;
 	}
 	else
+		// Отправка пустого сообщения клиенту
 		send(clientsocket, " ", 1, 0);
 }
 
@@ -222,12 +224,6 @@ void Server::delMessage()
 
 void Server::recvMessage()
 {
-#ifdef _WIN32
-	msg_file = std::fstream("../../messages.txt", std::ios::in | std::ios::out | std::ios::app);
-#else
-	msg_file = std::fstream("messages.txt", std::ios::in | std::ios::out | std::ios::app);
-#endif
-
 	// получение сообщения от клиента
 	char buffer[1024] = { 0 };
 	result = recv(clientsocket, buffer, 1024, 0);
@@ -253,11 +249,26 @@ void Server::recvMessage()
 		break;
 	}
 #endif
+	std::string from, to, text, line;
+	std::vector<std::string> lines;
+	std::istringstream iss = (std::istringstream)buffer;
+	while (std::getline(iss, line, ' '))
+		lines.push_back(line);
 
-	std::string data = buffer;
-	std::cout << "Message received: " << data << std::endl << std::endl;
-	msg_file << data << std::endl;
-	msg_file.close();
+	from = lines[0];
+	to = lines[1];
+	text = lines[2];
+
+	std::string query = "INSERT INTO messages (from_name, to_name, text) VALUES ('" + from + "', '" + to + "', '" + text +"')";
+
+	if (mysql_query(&mysql, query.c_str()) != 0)
+	{
+		std::cerr << "Ошибка при выполнении запроса: " << mysql_error(&mysql) << std::endl;
+		mysql_close(&mysql);
+		return;
+	}
+	else 
+		std::cout << "Message received: " << buffer << std::endl << std::endl;
 }
 
 void Server::serverUpdate()
