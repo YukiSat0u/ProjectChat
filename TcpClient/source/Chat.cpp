@@ -346,8 +346,6 @@ void Chat::addMessage()
 	}
 	else
 	{
-		std::string login, password, name, gender;
-
 		std::string queryName = "SELECT name FROM users WHERE name = '" + to + "'";
 		mysql_query(&mysql, queryName.c_str());
 		res = mysql_store_result(&mysql);
@@ -389,23 +387,23 @@ void Chat::deleteMessage()
 	std::cin.ignore();
 	std::getline(std::cin, text_to_remove);
 
-	std::ifstream users_file("users.txt");
-
 	if (strToUpper(to) == "ALL")
 	{
-		sendMessage(clientsocket, _currentUser->getUserLogin(), "All", text_to_remove); // Отправляем сообщение на сервер
+		sendMessage(clientsocket, _currentUser->getUserName(), "All", text_to_remove); // Отправляем сообщение на сервер
 	}
 	else
 	{
-		std::string login, password, name, gender;
+		std::string queryName = "SELECT name FROM users WHERE name = '" + to + "'";
+		mysql_query(&mysql, queryName.c_str());
+		res = mysql_store_result(&mysql);
 
 		bool found = false;
-		while (users_file >> login >> password >> name >> gender)
+		while (row = mysql_fetch_row(res))
 		{
-			if (strToUpper(name) == strToUpper(to))
+			if (strToUpper(row[0]) == strToUpper(to))
 			{
 				found = true;
-				sendMessage(clientsocket, _currentUser->getUserLogin(), getUserByName(to)->getUserName(), text_to_remove); // Отправляем сообщение на сервер
+				sendMessage(clientsocket, _currentUser->getUserName(), getUserByName(to)->getUserName(), text_to_remove); // Отправляем сообщение на сервер
 				break;
 			}
 		}
@@ -415,7 +413,7 @@ void Chat::deleteMessage()
 			return;
 		}
 	}
-	send(clientsocket, text_to_remove.c_str(), 1024, 0);
+	//send(clientsocket, text_to_remove.c_str(), 1024, 0);
 
 	int recv_size = recv(clientsocket, buffer, sizeof(buffer), 0);
 	if (recv_size < 0)

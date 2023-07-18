@@ -180,46 +180,38 @@ void Server::sentMessage()
 
 void Server::delMessage()
 {
-	msg_file = std::fstream("../../messages.txt", std::ios::in | std::ios::out | std::ios::app);
-	temp = std::fstream("../../temp.txt", std::ios::in | std::ios::out | std::ios::app);
-
 	char buffer[1024] = { 0 };
 	recv(clientsocket, buffer, 1024, 0);
 
 	std::string message_to_delete = buffer;
 
-	bool message_deleted = false;
+	std::string from, to, text, line;
+	std::vector<std::string> lines;
+	std::istringstream iss = (std::istringstream)buffer;
 
-	std::string data;
-	while (getline(msg_file, data))
+	while (std::getline(iss, line, ' '))
+		lines.push_back(line);
+
+	from = lines[0];
+	to = lines[1];
+	text = lines[2];
+
+	std::string query = "SELECT * FROM messages WHERE from_name = '" + from + "' AND to_name = '" + to + "' AND text = '" + text + "'";
+	
+	mysql_query(&mysql, query.c_str());
+	res = mysql_store_result(&mysql);
+
+	if (mysql_num_rows(res) > 0)
 	{
-		if (data != message_to_delete)
-		{
-			temp << data << std::endl;
-		}
-		else
-		{
-			message_deleted = true;
-		}
-	}
-	if (!message_deleted)
-	{
-		std::cout << "Message not found!" << std::endl << std::endl;
-		temp.close();
-		std::remove("../../temp.txt");
-		send(clientsocket, "Message not found!", 1024, 0);
-	}
-	else
-	{
-		std::cout << "Message deleted!" << std::endl << std::endl;
-		msg_file.close();
-		temp.close();
-		std::remove("../../messages.txt");
-		std::rename("../../temp.txt", "../../messages.txt");
-		std::remove("../../temp.txt");
+		// Удаление сообщения
+		std::string deleteQuery = "DELETE FROM messages WHERE from_name = '"
+			+ from + "' AND to_name = '" + to + "' AND text = '" + text + "'";
+		mysql_query(&mysql, deleteQuery.c_str());
 
 		send(clientsocket, "Message deleted!", 1024, 0);
 	}
+	else
+		send(clientsocket, "Message not found!", 1024, 0);
 }
 
 void Server::recvMessage()
