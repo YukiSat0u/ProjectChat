@@ -475,34 +475,16 @@ std::shared_ptr<User> Chat::getUserByName(const std::string& name)
 		return nullptr;
 }
 
-std::fstream& operator >>(std::fstream& is, User& obj)
+void Chat::chatClose()
 {
-	is >> obj._name;
-	is >> obj._login;
-	is >> obj._password;
-	is >> obj._gender;
-	return is;
-}
-std::ostream& operator <<(std::ostream& os, const User& obj)
-{
-	os << obj._login;
-	os << ' ';
-	os << obj._password;
-	os << ' ';
-	os << obj._name;
-	os << ' ';
-	os << obj._gender;
-	return os;
-}
+	mysql_close(&mysql);
+#ifdef _WIN32
 
-std::ostream& operator <<(std::ostream& os, const Message& msg)
-{
-	os << msg._from;;
-	os << ' ';
-	os << msg._to;
-	os << ' ';
-	os << msg._text;
-	return os;
+	closesocket(clientsocket);
+	WSACleanup();
+#else
+	close(chat.clientsocket);
+#endif
 }
 
 std::string Chat::strToUpper(std::string str)

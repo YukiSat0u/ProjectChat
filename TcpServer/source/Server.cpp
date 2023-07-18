@@ -135,11 +135,6 @@ void Server::singUp()
 	lines.clear();
 }
 
-void Server::login()
-{
-
-}
-
 void Server::sentMessage()
 {
 	char buffer[1024] = { 0 };
@@ -185,16 +180,13 @@ void Server::delMessage()
 
 	std::string message_to_delete = buffer;
 
-	std::string from, to, text, line;
-	std::vector<std::string> lines;
+	std::string from, to, text;
 	std::istringstream iss = (std::istringstream)buffer;
 
-	while (std::getline(iss, line, ' '))
-		lines.push_back(line);
+	iss >> from >> to;
 
-	from = lines[0];
-	to = lines[1];
-	text = lines[2];
+	std::getline(iss, text);
+	text = text.substr(1);
 
 	std::string query = "SELECT * FROM messages WHERE from_name = '" + from + "' AND to_name = '" + to + "' AND text = '" + text + "'";
 	
@@ -241,15 +233,13 @@ void Server::recvMessage()
 		break;
 	}
 #endif
-	std::string from, to, text, line;
-	std::vector<std::string> lines;
+	std::string from, to, text;
 	std::istringstream iss = (std::istringstream)buffer;
-	while (std::getline(iss, line, ' '))
-		lines.push_back(line);
 
-	from = lines[0];
-	to = lines[1];
-	text = lines[2];
+	iss >> from >> to;
+
+	std::getline(iss, text);
+	text = text.substr(1);
 
 	std::string query = "INSERT INTO messages (from_name, to_name, text) VALUES ('" + from + "', '" + to + "', '" + text +"')";
 
@@ -271,8 +261,6 @@ void Server::serverUpdate()
 		result = recv(clientsocket, buffer, 1024, 0);
 		if (strcmp(buffer, "singup") == 0)
 			singUp();
-		else if (strcmp(buffer, "login") == 0)
-			login();
 		else if (strcmp(buffer, "send") == 0)
 			recvMessage();
 		else if (strcmp(buffer, "recv") == 0)
@@ -288,6 +276,7 @@ void Server::serverClose()
 {
 	// закрытие соединений
 #ifdef _WIN32
+	mysql_close(&mysql);
 	closesocket(clientsocket);
 	closesocket(serversocket);
 	WSACleanup();

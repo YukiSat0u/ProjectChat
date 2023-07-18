@@ -34,7 +34,6 @@ public:
 	void sentMessage();
 	void delMessage();
 	void singUp();
-	void login();
 
 private:
 #ifdef _WIN32
@@ -60,7 +59,4 @@ private:
 
 	sockaddr_in server_address;
 	char client_ip[INET_ADDRSTRLEN];
-
-	std::fstream msg_file;
-	std::fstream temp;
 };

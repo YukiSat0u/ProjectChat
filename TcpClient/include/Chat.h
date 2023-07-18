@@ -49,6 +49,7 @@ public:
 	void showLoginMenu();
 	void showUserMenu();
 	void tcpConnect();
+	void chatClose();
 	void sendMessage(SOCKET clientSocket, const std::string& login, const std::string& to, const std::string& text);
 
 #ifdef _WIN32
@@ -64,7 +65,6 @@ private:
 	std::vector<User> _users;
 	std::vector<Message> _messages;
 	std::shared_ptr<User> _currentUser = nullptr;
-	std::fstream user_file = std::fstream("users.txt", std::ios::in | std::ios::out | std::ios::app);
 	std::string strToUpper(std::string str);
 
 	MYSQL mysql;

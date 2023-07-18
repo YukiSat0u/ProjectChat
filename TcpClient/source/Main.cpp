@@ -20,12 +20,8 @@ int main()
 			chat.showUserMenu();
 		}
 	}
-#ifdef _WIN32
-	closesocket(chat.clientsocket);
-	WSACleanup();
-#else
-    close(chat.clientsocket);
-#endif
+	
+	chat.chatClose();
 
 	return 0;
 }
