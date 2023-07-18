@@ -20,7 +20,7 @@ int Chat::bd()
 	else
 	{
 		// Если соединение успешно установлено выводим фразу — "Database connected!"
-		std::cout << "Database connected!" << std::endl;
+		//std::cout << "Database connected!" << std::endl;
 	}
 }
 
